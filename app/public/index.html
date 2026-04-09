@@ -21,6 +21,18 @@
         .auth-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
         .hidden { display: none; }
         #userBadge { font-weight: bold; color: var(--primary); }
+
+        .category-tag {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 10px;
+            text-transform: uppercase;
+        }   
     </style>
 </head>
 <body>
@@ -89,6 +101,29 @@
 <script>
     const API_URL = 'http://localhost:5000/api';
     let currentUser = JSON.parse(localStorage.getItem('user'));
+    let categoryMap = {};
+
+    async function loadCategories() {
+        try {
+            const res = await fetch(`${API_URL}/categories`);
+            const categories = await res.json();
+            const select = document.getElementById('categorySelect');
+            
+            select.innerHTML = '<option value="">Keine Kategorie</option>';
+            categoryMap = {}; 
+
+            categories.forEach(cat => {
+                categoryMap[cat._id] = cat.category;
+
+                const opt = document.createElement('option');
+                opt.value = cat._id;
+                opt.textContent = cat.category;
+                select.appendChild(opt);
+            });
+        } catch (err) {
+            console.error("Kategorien laden fehlgeschlagen", err);
+        }
+    }
 
     // --- HELPER FUNCTIONS ---
     function escapeHTML(str) {
@@ -150,10 +185,16 @@
                 const safeDesc = escapeHTML(e.description);
                 const safeText = escapeHTML(e.content?.text);
                 const safeAuthor = escapeHTML(e.authorId);
+                
+                // Kategorie-Name aus der Map holen
+                const categoryName = e.categoryId ? categoryMap[e.categoryId] : null;
+                const categoryTag = categoryName 
+                    ? `<span class="category-tag">${escapeHTML(categoryName)}</span>` 
+                    : '';
 
                 return `
                     <div class="card entry">
-                        <h2>${safeTitle}</h2>
+                        <h2>${safeTitle} ${categoryTag}</h2>
                         <div class="entry-meta">
                             Von <strong>${safeAuthor || 'System'}</strong> • 
                             ${new Date(e.creationDate).toLocaleDateString()} • 
@@ -175,7 +216,6 @@
             }).join('');
         } catch (err) {
             console.error("Fehler beim Laden:", err);
-            document.getElementById('blogEntries').innerHTML = "<p>Fehler beim Laden der Daten.</p>";
         }
     }
 
@@ -295,9 +335,13 @@
     }
 
     // --- INIT ---
-    updateUI();
-    loadEntries();
-    loadCategories();
+    async function init() {
+        updateUI();
+        await loadCategories(); 
+        await loadEntries();
+    }
+
+    init();
 </script>
 
 </body>
