@@ -45,6 +45,7 @@ db.createCollection("Entry", {
             additionalProperties: false,
             required: ["title", "description", "creationDate", "editDates", "impressionCount", "content", "commentsAllowed"],
             properties: {
+                _id: { bsonType: "objectId" },
                 title: {
                     bsonType: "string",
                     description: "'title' must be a string and is required"
@@ -59,9 +60,7 @@ db.createCollection("Entry", {
                 },
                 editDates: {
                     bsonType: "array",
-                    items: {
-                        bsonType: "date"
-                    },
+                    items: { bsonType: "date" },
                     description: "'editDates' must be an array of dates and is required"
                 },
                 impressionCount: {
@@ -77,28 +76,14 @@ db.createCollection("Entry", {
                     additionalProperties: false,
                     required: ["text"],
                     properties: {
-                        text: {
-                            bsonType: "string",
-                            description: "'text' must be a string and is required"
-                        },
-                        links: {
-                            bsonType: "array",
-                            items: {
-                                bsonType: "string"
-                            },
-                            description: "'links' must be an array of strings"
-                        },
-                        images: {
-                            bsonType: "array",
-                            items: {
-                                bsonType: "string"
-                            },
-                            description: "'images' must be an array of base64 encoded images"
-                        }
+                        text: { bsonType: "string", description: "'text' must be a string and is required" },
+                        links: { bsonType: "array", items: { bsonType: "string" }, description: "'links' must be an array of strings" },
+                        images: { bsonType: "array", items: { bsonType: "string" }, description: "'images' must be an array of base64 encoded images" }
                     }
                 },
-                authorId: { bsonType: "string" },    // foreign key User._id
-                categoryId: { bsonType: "string" }   // foreign key Category._id
+                authorId: { bsonType: "string" },
+                categoryId: { bsonType: "objectId" }
+
             }
         }
     }
@@ -112,6 +97,7 @@ db.createCollection("Category", {
             additionalProperties: false,
             required: ["category"],
             properties: {
+                _id: { bsonType: "objectId" },
                 category: {
                     bsonType: "string",
                     description: "'category' must be a string and is required"
@@ -129,6 +115,7 @@ db.createCollection("Comment", {
             additionalProperties: false,
             required: ["text", "likes", "creationDate"],
             properties: {
+                _id: { bsonType: "objectId" },
                 text: {
                     bsonType: "string",
                     description: "'text' must be a string and is required"
@@ -141,13 +128,11 @@ db.createCollection("Comment", {
                     bsonType: "date",
                     description: "'creationDate' must be a date and is required"
                 },
-                entryId: { bsonType: "string" },     // foreign key Entry._id
-                authorId: { bsonType: "string" }     // foreign key User._id
+                entryId: { bsonType: "objectId" },
+                authorId: { bsonType: "string" }
             }
         }
     }
 });
-
-db.User.createIndex({ _id: 1 }, { unique: true });
 
 db.Entry.createIndex({ title: 1, authorId: 1 }, { unique: true });
