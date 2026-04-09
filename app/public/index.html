@@ -74,6 +74,26 @@
             margin-top: 8px;
             border: 1px solid #999999;
         }
+        .comments {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #999999;
+        }
+        .comment-item {
+            background: #eeeeee;
+            border: 1px solid #999999;
+            padding: 6px 8px;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+        .comment-meta {
+            color: #666666;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        .comment-form textarea {
+            width: 95%;
+        }
         .auth-section { 
             display: block;
             margin-bottom: 20px;
@@ -311,6 +331,81 @@
         setEditMode(entry);
     }
 
+    async function loadCommentsForEntry(entryId) {
+        const id = normalizeId(entryId);
+        const listEl = document.getElementById(`commentsList-${id}`);
+        if (!listEl) return;
+
+        listEl.innerHTML = '<p style="font-size:12px; color:#666666;">Lade Kommentare...</p>';
+
+        try {
+            const res = await fetch(`${API_URL}/comments?entryId=${encodeURIComponent(id)}`);
+            const comments = await res.json();
+
+            if (!comments || comments.length === 0) {
+                listEl.innerHTML = '<p style="font-size:12px; color:#666666;">Keine Kommentare.</p>';
+                return;
+            }
+
+            listEl.innerHTML = comments.map(c => {
+                const safeAuthor = escapeHTML(c.authorId);
+                const safeText = escapeHTML(c.text);
+                const created = c.creationDate ? new Date(c.creationDate).toLocaleString() : '';
+                return `
+                    <div class="comment-item">
+                        <div class="comment-meta">Von <strong>${safeAuthor || 'System'}</strong> • ${escapeHTML(created)}</div>
+                        <div>${safeText}</div>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            console.error('Kommentare laden fehlgeschlagen', err);
+            listEl.innerHTML = '<p style="font-size:12px; color:#666666;">Kommentare konnten nicht geladen werden.</p>';
+        }
+    }
+
+    async function submitComment(e, entryId) {
+        e.preventDefault();
+
+        const id = normalizeId(entryId);
+        if (!currentUser) {
+            alert('Bitte einloggen, um zu kommentieren.');
+            return false;
+        }
+
+        const entry = entriesById[id];
+        if (!entry) {
+            alert('Beitrag nicht gefunden (bitte neu laden).');
+            return false;
+        }
+        if (!entry.commentsAllowed) {
+            alert('Kommentare sind für diesen Beitrag deaktiviert.');
+            return false;
+        }
+
+        const input = document.getElementById(`commentText-${id}`);
+        if (!input) return false;
+        const text = (input.value || '').trim();
+        if (!text) return false;
+
+        const res = await fetch(`${API_URL}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, entryId: id, authorId: currentUser.username })
+        });
+
+        if (!res.ok) {
+            let errData = null;
+            try { errData = await res.json(); } catch { }
+            alert('Fehler: ' + (errData?.error || errData?.details || 'Kommentar konnte nicht gespeichert werden'));
+            return false;
+        }
+
+        input.value = '';
+        await loadCommentsForEntry(id);
+        return false;
+    }
+
     // --- API CALLS ---
 
     // 1. Load Entries (Repariert!)
@@ -350,6 +445,18 @@
                     ? `<button type="button" onclick="startEdit('${entryId}')" style="padding: 5px 10px; margin-top:10px">Bearbeiten</button>`
                     : '';
 
+                const commentsAllowed = Boolean(e.commentsAllowed);
+                const canComment = Boolean(currentUser) && commentsAllowed;
+                const commentForm = commentsAllowed
+                    ? `
+                        <form class="comment-form" onsubmit="return submitComment(event, '${entryId}')" style="margin-top:10px;">
+                            <textarea id="commentText-${entryId}" rows="2" placeholder="Kommentar schreiben..." ${canComment ? '' : 'disabled'}></textarea>
+                            <button type="submit" style="padding: 5px 10px;" ${canComment ? '' : 'disabled'}>Kommentieren</button>
+                            ${currentUser ? '' : '<div style="font-size:11px; color:#666666; margin-top:4px;">Zum Kommentieren bitte einloggen.</div>'}
+                        </form>
+                    `
+                    : `<div style="font-size:11px; color:#666666; margin-top:10px;">Kommentare sind deaktiviert.</div>`;
+
                 return `
                     <div class="card entry">
                         <h2>${safeTitle} ${categoryTag}</h2>
@@ -369,10 +476,21 @@
                                 }).join('') || ''}
                             </div>
                             ${editBtn}
+
+                            <div class="comments">
+                                <h4 style="margin: 8px 0;">Kommentare</h4>
+                                <div id="commentsList-${entryId}"></div>
+                                ${commentForm}
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            (data || []).forEach(e => {
+                const id = normalizeId(e._id);
+                loadCommentsForEntry(id);
+            });
         } catch (err) {
             console.error("Fehler beim Laden:", err);
         }

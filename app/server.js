@@ -155,11 +155,57 @@ app.put('/api/entries/:id', async (req, res) => {
 
 // --- COMMENT ROUTES ---
 
+app.get('/api/comments', async (req, res) => {
+    try {
+        const { entryId } = req.query;
+        const filter = {};
+
+        if (entryId) {
+            if (!ObjectId.isValid(entryId)) {
+                return res.status(400).json({ error: "Ungültige Entry-ID" });
+            }
+            filter.entryId = new ObjectId(entryId);
+        }
+
+        const comments = await db
+            .collection('Comment')
+            .find(filter)
+            .sort({ creationDate: 1 })
+            .toArray();
+
+        res.json(comments);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/comments', async (req, res) => {
     try {
         const { text, entryId, authorId } = req.body;
+        const trimmedText = (text || "").toString().trim();
+
+        if (!trimmedText) {
+            return res.status(400).json({ error: "Kommentartext fehlt" });
+        }
+
+        if (!entryId || !ObjectId.isValid(entryId)) {
+            return res.status(400).json({ error: "Ungültige Entry-ID" });
+        }
+
+        const entry = await db.collection('Entry').findOne({ _id: new ObjectId(entryId) });
+        if (!entry) {
+            return res.status(404).json({ error: "Beitrag nicht gefunden" });
+        }
+        if (!entry.commentsAllowed) {
+            return res.status(403).json({ error: "Kommentare sind für diesen Beitrag deaktiviert" });
+        }
+
+        if (!authorId) {
+            return res.status(400).json({ error: "authorId fehlt" });
+        }
+
         const newComment = {
-            text,
+            text: trimmedText,
             likes: Long.fromNumber(0),
             creationDate: new Date(),
             entryId: new ObjectId(entryId),
