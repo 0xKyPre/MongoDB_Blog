@@ -96,7 +96,9 @@ db.createCollection("Entry", {
                             description: "'images' must be an array of base64 encoded images"
                         }
                     }
-                }
+                },
+                authorId: { bsonType: "string" },    // foreign key User._id
+                categoryId: { bsonType: "string" }   // foreign key Category._id
             }
         }
     }
@@ -138,8 +140,14 @@ db.createCollection("Comment", {
                 creationDate: {
                     bsonType: "date",
                     description: "'creationDate' must be a date and is required"
-                }
+                },
+                entryId: { bsonType: "string" },     // foreign key Entry._id
+                authorId: { bsonType: "string" }     // foreign key User._id
             }
         }
     }
 });
+
+db.User.createIndex({ _id: 1 }, { unique: true });
+
+db.Entry.createIndex({ title: 1, authorId: 1 }, { unique: true });
