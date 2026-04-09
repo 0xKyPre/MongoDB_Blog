@@ -10,7 +10,7 @@ Entity User {
 Entity Entry {
     title: string
     description: string
-    reationDate: Date
+    creationDate: Date
     editDates: Date[]
     impressionCount: number
     content: Object
