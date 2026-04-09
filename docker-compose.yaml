@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongodb/mongodb-community-server:latest
+    container_name: blog_db
+    ports:
+      - 27018:27017
+    environment:
+      MONGO_INITDB_DATABASE: blogDB
+    volumes:
+      - blog-db:/data/db
+    networks:
+      - blog-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: blog_backend
+    ports:
+      - 5000:5000
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/blogDB
+    depends_on:
+      - mongodb
+    networks:
+      - blog-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: blog_frontend
+    ports:
+      - 4200:80
+    depends_on:
+      - backend
+    networks:
+      - blog-network
+
+volumes:
+  blog-db:
+
+networks:
+  blog-network:
