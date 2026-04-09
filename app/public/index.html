@@ -78,10 +78,31 @@
 </div>
 
 <script>
-    // Server URL (Anpassen falls nötig)
     const API_URL = 'http://localhost:5000/api';
     let currentUser = JSON.parse(localStorage.getItem('user'));
 
+    // --- HELPER FUNCTIONS ---
+    function escapeHTML(str) {
+        if (!str) return "";
+        const p = document.createElement('p');
+        p.textContent = str;
+        return p.innerHTML;
+    }
+
+    function ensureAbsoluteUrl(url) {
+        if (!url) return "";
+        if (!/^https?:\/\//i.test(url)) return 'https://' + url;
+        return url;
+    }
+
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+
+    // --- UI LOGIC ---
     function updateUI() {
         if (currentUser) {
             document.getElementById('userBadge').innerText = `Hallo, ${currentUser.displayName}`;
@@ -96,14 +117,60 @@
         }
     }
 
-    const toBase64 = file => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
+    function logout() {
+        localStorage.removeItem('user');
+        location.reload();
+    }
 
-    // LOGIN
+    // --- API CALLS ---
+
+    // 1. Load Entries (Repariert!)
+    async function loadEntries() {
+        try {
+            const res = await fetch(`${API_URL}/entries`);
+            const data = await res.json();
+            const container = document.getElementById('blogEntries');
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = "<p>Noch keine Beiträge vorhanden.</p>";
+                return;
+            }
+
+            container.innerHTML = data.map(e => {
+                const safeTitle = escapeHTML(e.title);
+                const safeDesc = escapeHTML(e.description);
+                const safeText = escapeHTML(e.content?.text);
+                const safeAuthor = escapeHTML(e.authorId);
+
+                return `
+                    <div class="card entry">
+                        <h2>${safeTitle}</h2>
+                        <div class="entry-meta">
+                            Von <strong>${safeAuthor || 'System'}</strong> • 
+                            ${new Date(e.creationDate).toLocaleDateString()} • 
+                            Aufrufe: ${e.impressionCount}
+                        </div>
+                        <p><em>${safeDesc}</em></p>
+                        <div class="entry-content">
+                            <p>${safeText}</p>
+                            ${e.content?.images?.map(img => `<img src="${img}">`).join('') || ''}
+                            <div style="margin-top:15px">
+                                ${e.content?.links?.map(l => {
+                                    const absoluteUrl = ensureAbsoluteUrl(l);
+                                    return `<a href="${absoluteUrl}" target="_blank" rel="noopener noreferrer" style="margin-right:10px">${escapeHTML(l)}</a>`;
+                                }).join('') || ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            console.error("Fehler beim Laden:", err);
+            document.getElementById('blogEntries').innerHTML = "<p>Fehler beim Laden der Daten.</p>";
+        }
+    }
+
+    // 2. Login
     document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
         try {
@@ -124,7 +191,7 @@
         } catch (err) { alert("Server nicht erreichbar"); }
     };
 
-    // REGISTER
+    // 3. Register
     document.getElementById('registerForm').onsubmit = async (e) => {
         e.preventDefault();
         const res = await fetch(`${API_URL}/users/register`, {
@@ -138,63 +205,22 @@
                 country: document.getElementById('regCountry').value
             })
         });
-        if(res.ok) alert("Registrierung erfolgreich!");
-        else alert("Fehler (User existiert evtl. schon)");
+        if(res.ok) alert("Registrierung erfolgreich! Bitte jetzt einloggen.");
+        else alert("Fehler bei Registrierung.");
     };
 
-    function logout() {
-        localStorage.removeItem('user');
-        location.reload();
-    }
-
-    // LOAD ENTRIES
-    async function loadEntries() {
-        try {
-            const res = await fetch(`${API_URL}/entries`);
-            const data = await res.json();
-            const container = document.getElementById('blogEntries');
-            
-            if (!data.length) {
-                container.innerHTML = "<p>Noch keine Beiträge vorhanden.</p>";
-                return;
-            }
-
-            container.innerHTML = data.map(e => `
-                <div class="card entry">
-                    <h2>${e.title}</h2>
-                    <div class="entry-meta">
-                        Von <strong>${e.authorId || 'System'}</strong> • 
-                        ${new Date(e.creationDate).toLocaleDateString()} • 
-                        Aufrufe: ${e.impressionCount}
-                    </div>
-                    <p><em>${e.description}</em></p>
-                    <div class="entry-content">
-                        <p>${e.content.text}</p>
-                        ${e.content.images?.map(img => `<img src="${img}">`).join('') || ''}
-                        <div style="margin-top:15px">
-                            ${e.content.links?.map(l => `<a href="${l}" target="_blank" style="margin-right:10px">Link</a>`).join('') || ''}
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        } catch (err) { console.error("Fehler beim Laden:", err); }
-    }
-
-    // CREATE ENTRY
+    // 4. Create Entry
     document.getElementById('blogForm').onsubmit = async (e) => {
         e.preventDefault();
-        
         const imageFiles = document.getElementById('imageInput').files;
         const base64Images = [];
-        for(let file of imageFiles) {
-            base64Images.push(await toBase64(file));
-        }
+        for(let file of imageFiles) base64Images.push(await toBase64(file));
 
         const payload = {
             title: document.getElementById('title').value,
             description: document.getElementById('desc').value,
             commentsAllowed: document.getElementById('allowComments').checked,
-            authorId: currentUser.username, // Matcht Schema-Feld
+            authorId: currentUser.username,
             content: {
                 text: document.getElementById('textContent').value,
                 links: document.getElementById('links').value.split(',').map(l => l.trim()).filter(l => l !== ""),
@@ -208,15 +234,14 @@
             body: JSON.stringify(payload)
         });
 
-        if (res.ok) {
-            location.reload();
-        } else {
+        if (res.ok) location.reload();
+        else {
             const errData = await res.json();
-            alert("Schema-Fehler: " + errData.details);
+            alert("Fehler: " + (errData.details || "Schema-Validierung fehlgeschlagen"));
         }
     };
 
-    // Initialisierung
+    // --- INIT ---
     updateUI();
     loadEntries();
 </script>
