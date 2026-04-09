@@ -13,32 +13,6 @@ services:
     networks:
       - blog-network
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: blog_backend
-    ports:
-      - 5000:5000
-    environment:
-      MONGO_URI: mongodb://mongodb:27017/blogDB
-    depends_on:
-      - mongodb
-    networks:
-      - blog-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: blog_frontend
-    ports:
-      - 4200:80
-    depends_on:
-      - backend
-    networks:
-      - blog-network
-
 volumes:
   blog-db:
 
