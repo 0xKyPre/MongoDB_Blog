@@ -53,7 +53,8 @@ db.Entry.aggregate([
                 $expr: {
                     $regexMatch: {
                         input: "$content.text",
-                        regex: "$title"
+                        regex: "$title",
+                        options: "i"
                     }
                 }
             }

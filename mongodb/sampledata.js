@@ -14,12 +14,12 @@ const foodCat = db.Category.insertOne({ category: "Food" }).insertedId;
 // Entries (ObjectIds auto-generated)
 const entry1Id = db.Entry.insertOne({
     title: "My First Tech Blog",
-    description: "An introduction to technology trends.",
+    description: "An introduction to technology trends",
     creationDate: new Date(),
     editDates: [],
     impressionCount: NumberLong(0),
     commentsAllowed: true,
-    content: { text: "This is my first post about technology!", links: ["https://tech.example.com"], images: [] },
+    content: { text: "This is my first post about technology!, My First Tech Blog", links: ["https://tech.example.com"], images: [] },
     authorId: "alice",       // string
     categoryId: techCat      // ObjectId
 }).insertedId;
