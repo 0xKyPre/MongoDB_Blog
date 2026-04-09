@@ -1,0 +1,34 @@
+@startuml Blog
+Entity User {
+    _id: string (username)
+    displayName: string
+    birthday: Date
+    country: string
+    
+}
+
+Entity Entry {
+    title: string
+    description: string
+    reationDate: Date
+    editDates: Date[]
+    impressionCount: number
+    content: Object
+    commentsAllowed: bool
+}
+
+Entity Category {
+    category: string
+}
+
+Entity Comment {
+    text: string
+    likes: number
+    creationDate
+}
+
+User ||--o{ Entry
+Entry ||--o{ Comment
+Entry }|--|| Category
+User ||--o{ Comment
+@enduml
