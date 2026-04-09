@@ -99,6 +99,60 @@ app.post('/api/entries', async (req, res) => {
     }
 });
 
+app.put('/api/entries/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Ungültige Entry-ID" });
+        }
+
+        const existing = await db.collection('Entry').findOne({ _id: new ObjectId(id) });
+        if (!existing) {
+            return res.status(404).json({ error: "Beitrag nicht gefunden" });
+        }
+
+        const { title, description, content, commentsAllowed, authorId, categoryId } = req.body;
+
+        if (!authorId || existing.authorId !== authorId) {
+            return res.status(403).json({ error: "Nicht berechtigt, diesen Beitrag zu bearbeiten" });
+        }
+
+        const setDoc = {
+            title: title,
+            description: description,
+            commentsAllowed: Boolean(commentsAllowed),
+            'content.text': (content && content.text) ? content.text : "",
+            'content.links': (content && Array.isArray(content.links)) ? content.links : []
+        };
+
+        if (content && Object.prototype.hasOwnProperty.call(content, 'images')) {
+            setDoc['content.images'] = Array.isArray(content.images) ? content.images : [];
+        }
+
+        const update = {
+            $set: setDoc,
+            $push: { editDates: new Date() }
+        };
+
+        if (categoryId && typeof categoryId === 'string' && categoryId.trim() !== "" && categoryId.length === 24 && ObjectId.isValid(categoryId)) {
+            update.$set.categoryId = new ObjectId(categoryId);
+        } else {
+            update.$unset = { categoryId: "" };
+        }
+
+        const result = await db.collection('Entry').findOneAndUpdate(
+            { _id: new ObjectId(id) },
+            update,
+            { returnDocument: 'after' }
+        );
+
+        res.json({ success: true, entry: result.value });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ error: "Update fehlgeschlagen", details: err.message });
+    }
+});
+
 // --- COMMENT ROUTES ---
 
 app.post('/api/comments', async (req, res) => {

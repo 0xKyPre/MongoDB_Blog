@@ -157,7 +157,11 @@
     </section>
 
     <section id="editorArea" class="card hidden">
-        <h3>Neuen Blog-Beitrag schreiben</h3>
+        <h3 id="editorHeading">Neuen Blog-Beitrag schreiben</h3>
+        <div id="editModeBar" class="hidden" style="margin: 10px 0; padding: 8px; border: 1px solid #999999; background: #eeeeee;">
+            <strong>Bearbeiten:</strong> <span id="editModeTitle"></span>
+            <button type="button" onclick="cancelEdit()" style="padding: 5px 10px; margin-left:10px">Abbrechen</button>
+        </div>
         <form id="blogForm">
             <input type="text" id="title" placeholder="Titel des Beitrags" required>
             
@@ -175,7 +179,7 @@
             <label>Bilder hochladen (Base64):</label>
             <input type="file" id="imageInput" accept="image/*" multiple>
             <label><input type="checkbox" id="allowComments" checked> Kommentare erlauben</label>
-            <button type="submit">Beitrag veröffentlichen</button>
+            <button type="submit" id="submitEntryBtn">Beitrag veröffentlichen</button>
         </form>
     </section>
 
@@ -190,6 +194,16 @@
     const API_URL = 'http://localhost:5000/api';
     let currentUser = JSON.parse(localStorage.getItem('user'));
     let categoryMap = {};
+    let entriesById = {};
+    let editingEntryId = null;
+    let editingEntryOriginal = null;
+
+    function normalizeId(value) {
+        if (!value) return "";
+        if (typeof value === 'string') return value;
+        if (typeof value === 'object' && value.$oid) return value.$oid;
+        return String(value);
+    }
 
     async function loadCategories() {
         try {
@@ -201,10 +215,11 @@
             categoryMap = {}; 
 
             categories.forEach(cat => {
-                categoryMap[cat._id] = cat.category;
+                const id = normalizeId(cat._id);
+                categoryMap[id] = cat.category;
 
                 const opt = document.createElement('option');
-                opt.value = cat._id;
+                opt.value = id;
                 opt.textContent = cat.category;
                 select.appendChild(opt);
             });
@@ -254,6 +269,48 @@
         location.reload();
     }
 
+    function setEditMode(entry) {
+        editingEntryId = normalizeId(entry?._id);
+        editingEntryOriginal = entry || null;
+
+        document.getElementById('editorHeading').innerText = 'Blog-Beitrag bearbeiten';
+        document.getElementById('submitEntryBtn').innerText = 'Änderungen speichern';
+        document.getElementById('editModeBar').classList.remove('hidden');
+        document.getElementById('editModeTitle').innerText = entry?.title || '';
+
+        document.getElementById('title').value = entry?.title || '';
+        document.getElementById('desc').value = entry?.description || '';
+        document.getElementById('textContent').value = entry?.content?.text || '';
+        document.getElementById('links').value = (entry?.content?.links || []).join(', ');
+        document.getElementById('allowComments').checked = Boolean(entry?.commentsAllowed);
+
+        const catId = normalizeId(entry?.categoryId);
+        document.getElementById('categorySelect').value = catId || '';
+        document.getElementById('imageInput').value = '';
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+        editingEntryId = null;
+        editingEntryOriginal = null;
+        document.getElementById('editorHeading').innerText = 'Neuen Blog-Beitrag schreiben';
+        document.getElementById('submitEntryBtn').innerText = 'Beitrag veröffentlichen';
+        document.getElementById('editModeBar').classList.add('hidden');
+        document.getElementById('editModeTitle').innerText = '';
+        document.getElementById('blogForm').reset();
+        document.getElementById('imageInput').value = '';
+        document.getElementById('categorySelect').value = '';
+    }
+
+    function startEdit(entryId) {
+        const id = normalizeId(entryId);
+        const entry = entriesById[id];
+        if (!entry) return alert('Beitrag nicht gefunden (bitte neu laden).');
+        if (!currentUser || entry.authorId !== currentUser.username) return alert('Du kannst nur deine eigenen Beiträge bearbeiten.');
+        setEditMode(entry);
+    }
+
     // --- API CALLS ---
 
     // 1. Load Entries (Repariert!)
@@ -262,6 +319,12 @@
             const res = await fetch(`${API_URL}/entries`);
             const data = await res.json();
             const container = document.getElementById('blogEntries');
+
+            entriesById = {};
+            (data || []).forEach(e => {
+                const id = normalizeId(e._id);
+                entriesById[id] = e;
+            });
             
             if (!data || data.length === 0) {
                 container.innerHTML = "<p>Noch keine Beiträge vorhanden.</p>";
@@ -275,9 +338,16 @@
                 const safeAuthor = escapeHTML(e.authorId);
                 
                 // Kategorie-Name aus der Map holen
-                const categoryName = e.categoryId ? categoryMap[e.categoryId] : null;
+                const categoryId = normalizeId(e.categoryId);
+                const categoryName = categoryId ? categoryMap[categoryId] : null;
                 const categoryTag = categoryName 
                     ? `<span class="category-tag">${escapeHTML(categoryName)}</span>` 
+                    : '';
+
+                const entryId = normalizeId(e._id);
+                const canEdit = currentUser && e.authorId === currentUser.username;
+                const editBtn = canEdit
+                    ? `<button type="button" onclick="startEdit('${entryId}')" style="padding: 5px 10px; margin-top:10px">Bearbeiten</button>`
                     : '';
 
                 return `
@@ -298,6 +368,7 @@
                                     return `<a href="${absoluteUrl}" target="_blank" rel="noopener noreferrer" style="margin-right:10px">${escapeHTML(l)}</a>`;
                                 }).join('') || ''}
                             </div>
+                            ${editBtn}
                         </div>
                     </div>
                 `;
@@ -351,54 +422,43 @@
         e.preventDefault();
         const imageFiles = document.getElementById('imageInput').files;
         const base64Images = [];
-        for(let file of imageFiles) base64Images.push(await toBase64(file));
+        for (let file of imageFiles) base64Images.push(await toBase64(file));
 
         const payload = {
             title: document.getElementById('title').value,
             description: document.getElementById('desc').value,
             commentsAllowed: document.getElementById('allowComments').checked,
             authorId: currentUser.username,
-            categoryId: document.getElementById('categorySelect').value, // ID aus Dropdown
+            categoryId: document.getElementById('categorySelect').value,
             content: {
                 text: document.getElementById('textContent').value,
-                links: document.getElementById('links').value.split(',').map(l => l.trim()).filter(l => l !== ""),
-                images: base64Images
+                links: document.getElementById('links').value.split(',').map(l => l.trim()).filter(l => l !== "")
             }
         };
 
-        const res = await fetch(`${API_URL}/entries`, {
-            method: 'POST',
+        if (imageFiles && imageFiles.length > 0) {
+            payload.content.images = base64Images;
+        }
+
+        const isEditing = Boolean(editingEntryId);
+        const url = isEditing ? `${API_URL}/entries/${editingEntryId}` : `${API_URL}/entries`;
+        const method = isEditing ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        if (res.ok) location.reload();
-        else {
-            const errData = await res.json();
-            alert("Fehler: " + (errData.details || "Schema-Validierung fehlgeschlagen"));
+        if (res.ok) {
+            cancelEdit();
+            await loadEntries();
+        } else {
+            let errData = null;
+            try { errData = await res.json(); } catch { }
+            alert("Fehler: " + (errData?.details || errData?.error || "Schema-Validierung fehlgeschlagen"));
         }
     };
-
-    // --- Kategorien laden ---
-    async function loadCategories() {
-        try {
-            const res = await fetch(`${API_URL}/categories`);
-            const categories = await res.json();
-            const select = document.getElementById('categorySelect');
-            
-            // Zurücksetzen außer der ersten Option
-            select.innerHTML = '<option value="">Keine Kategorie</option>';
-            
-            categories.forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat._id;
-                opt.textContent = cat.category;
-                select.appendChild(opt);
-            });
-        } catch (err) {
-            console.error("Kategorien laden fehlgeschlagen", err);
-        }
-    }
 
     // --- Kategorie hinzufügen ---
     async function addNewCategory() {
