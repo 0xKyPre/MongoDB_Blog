@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>My MongoDB Blog</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: auto; background: #f4f4f4; }
+        .entry { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        img { max-width: 100%; border-radius: 4px; }
+        form { display: flex; flex-direction: column; gap: 10px; background: #eee; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+        <h1>Blog System</h1>
+        <img src="image.png" alt="at" height="30">
+    </div>
+
+
+    <section id="add-entry">
+        <h3>Neuer Beitrag</h3>
+        <form id="blogForm">
+            <input type="text" id="title" placeholder="Titel" required>
+            <textarea id="desc" placeholder="Beschreibung"></textarea>
+            <input type="file" id="imageInput" accept="image/*">
+            <button type="submit">Veröffentlichen</button>
+        </form>
+    </section>
+
+    <div id="blogEntries"></div>
+
+    <script>
+        // Funktion zum Umwandeln von Bildern in Base64
+        const toBase64 = file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+
+        async function loadEntries() {
+            const res = await fetch('/api/entries');
+            const data = await res.json();
+            const container = document.getElementById('blogEntries');
+            container.innerHTML = data.map(e => `
+                <div class="entry">
+                    <h2>${e.title}</h2>
+                    <p>${e.description}</p>
+                    ${e.content?.image ? `<img src="${e.content.image}">` : ''}
+                    <small>Erstellt am: ${new Date(e.creationDate).toLocaleDateString()}</small>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('blogForm').onsubmit = async (e) => {
+            e.preventDefault();
+            let imageData = null;
+            const file = document.getElementById('imageInput').files[0];
+            if (file) imageData = await toBase64(file);
+
+            const payload = {
+                title: document.getElementById('title').value,
+                description: document.getElementById('desc').value,
+                content: { image: imageData },
+                author: { username: "admin" }, // Statisch für dieses Beispiel
+                commentsAllowed: true
+            };
+
+            await fetch('/api/entries', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            location.reload();
+        };
+
+        loadEntries();
+    </script>
+</body>
+</html>
