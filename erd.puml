@@ -1,10 +1,10 @@
 @startuml Blog
 Entity User {
     _id: string (username)
+    password: string
     displayName: string
     birthday: Date
     country: string
-    
 }
 
 Entity Entry {
