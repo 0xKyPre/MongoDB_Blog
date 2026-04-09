@@ -1,8 +1,15 @@
-db.collection.insertOne({
-    "authorId": "inder",
+use blog
+
+db.Entry.insertOne({
+    "title": "in der tat",
+    "description": "in der tat die inder tat",
+    "creationDate": ISODate("2026-04-09T00:00:00Z"),
+    "editDates": [],
+    "impressionCount": NumberLong(0),
     "commentsAllowed": true,
+    "authorId": "inder",
     "content": {
-        "text" : "in der tat\nist die tat\ndie ein\ninder tat in\nder tat eine\nindertat",
+        "text" : "in der tat\nist die    tat\ndie ein\ninder tat in\nder tat eine\nindertat",
         "links": [
             "inder.tat.gv.at"
             ],
