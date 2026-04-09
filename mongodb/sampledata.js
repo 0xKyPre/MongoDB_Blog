@@ -41,3 +41,48 @@ db.Comment.insertMany([
     { text: "Great post, very informative!", likes: NumberLong(3), creationDate: new Date(), entryId: entry1Id, authorId: "bob" },
     { text: "Thanks for sharing your travel experience!", likes: NumberLong(5), creationDate: new Date(), entryId: entry2Id, authorId: "alice" }
 ]);
+
+// -----------------------
+// Additional Users
+// -----------------------
+db.User.insertMany([
+    { _id: "carol", displayName: "Carol White", password: "passCarol1", birthday: new Date("1992-07-10"), country: "UK" },
+    { _id: "dave", displayName: "Dave Brown", password: "davePass99", birthday: new Date("1988-02-25"), country: "Australia" },
+    { _id: "eve", displayName: "Eve Black", password: "evePass77", birthday: new Date("1995-11-05"), country: "Germany" }
+]);
+
+// -----------------------
+// Additional Entry for Alice
+// -----------------------
+const entry3Id = db.Entry.insertOne({
+    title: "Advanced Tech Thoughts",
+    description: "Alice shares advanced insights on tech trends.",
+    creationDate: new Date(),
+    editDates: [],
+    impressionCount: NumberLong(0),
+    commentsAllowed: true,
+    content: {
+        text: "Let’s explore some deep tech insights in AI and blockchain...",
+        links: ["https://advancedtech.example.com"],
+        images: []
+    },
+    authorId: "alice",
+    categoryId: db.Category.findOne({ category: "Technology" })._id
+}).insertedId;
+
+// -----------------------
+// Comments on original posts
+// -----------------------
+db.Comment.insertMany([
+    // Comments on "My First Tech Blog" (Alice)
+    { text: "Interesting introduction to tech!", likes: NumberLong(2), creationDate: new Date(), entryId: db.Entry.findOne({ title: "My First Tech Blog" })._id, authorId: "carol" },
+    { text: "Thanks Alice, very helpful!", likes: NumberLong(1), creationDate: new Date(), entryId: db.Entry.findOne({ title: "My First Tech Blog" })._id, authorId: "dave" },
+
+    // Comments on "Exploring Italy" (Bob)
+    { text: "Looks like a fun trip!", likes: NumberLong(3), creationDate: new Date(), entryId: db.Entry.findOne({ title: "Exploring Italy" })._id, authorId: "carol" },
+    { text: "I want to visit Italy too!", likes: NumberLong(2), creationDate: new Date(), entryId: db.Entry.findOne({ title: "Exploring Italy" })._id, authorId: "eve" },
+
+    // Comments on Alice’s new post
+    { text: "Great insights, Alice!", likes: NumberLong(5), creationDate: new Date(), entryId: entry3Id, authorId: "bob" },
+    { text: "Loved the deep dive into AI!", likes: NumberLong(4), creationDate: new Date(), entryId: entry3Id, authorId: "eve" }
+]);
