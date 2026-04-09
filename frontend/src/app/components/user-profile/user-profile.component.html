@@ -1,0 +1,41 @@
+<div class="profile-container" *ngIf="currentUser">
+  <header class="profile-header">
+    <h1>{{ currentUser.name.firstname }} {{ currentUser.name.lastname }}</h1>
+    <p class="username">@{{ currentUser.username }}</p>
+    <p class="email">{{ currentUser.email }}</p>
+    <div class="actions">
+      <a routerLink="/blog-form" class="btn btn-primary">New Entry</a>
+      <button (click)="logout()" class="btn btn-secondary">Logout</button>
+    </div>
+  </header>
+
+  <section class="entries-section">
+    <h2>Your Blog Entries</h2>
+
+    <div *ngIf="loading" class="loading">Loading your entries...</div>
+
+    <div *ngIf="error" class="error">{{ error }}</div>
+
+    <div *ngIf="!loading && !error">
+      <div *ngIf="userEntries.length === 0" class="no-entries">
+        You haven't created any blog entries yet.
+        <a routerLink="/blog-form">Create your first entry</a>
+      </div>
+
+      <div class="entries-list">
+        <div *ngFor="let entry of userEntries" class="entry-item">
+          <h3>{{ entry.title }}</h3>
+          <p class="date">{{ formatDate(entry.creationDate) }}</p>
+          <p class="stats">
+            👁️ {{ entry.impressionCount }} views • 💬
+            {{ entry.comments?.length || 0 }} comments
+          </p>
+          <div class="entry-actions">
+            <a [routerLink]="['/blog', entry._id]" class="btn-view">View</a>
+            <a [routerLink]="['/blog-form', entry._id]" class="btn-edit">Edit</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

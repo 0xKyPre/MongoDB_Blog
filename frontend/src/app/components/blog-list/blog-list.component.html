@@ -1,0 +1,31 @@
+<div class="blog-list-container">
+  <h1>Blog Entries</h1>
+
+  <div *ngIf="loading" class="loading">Loading blog entries...</div>
+
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <div class="entries" *ngIf="!loading && !error">
+    <div *ngIf="entries.length === 0" class="no-entries">
+      No blog entries found. Start by creating one!
+    </div>
+
+    <div *ngFor="let entry of entries" class="blog-card">
+      <h2>{{ entry.title }}</h2>
+      <p class="meta">
+        by <strong>{{ getAuthorName(entry) }}</strong> on
+        {{ formatDate(entry.creationDate) }}
+      </p>
+      <p class="description">{{ entry.description }}</p>
+      <div class="meta-info">
+        <span class="views">👁️ {{ entry.impressionCount }} views</span>
+        <span
+          class="comments"
+          *ngIf="entry.commentsAllowed && entry.comments">
+          💬 {{ entry.comments.length }} comments
+        </span>
+      </div>
+      <a [routerLink]="['/blog', entry._id]" class="btn-read">Read More</a>
+    </div>
+  </div>
+</div>
