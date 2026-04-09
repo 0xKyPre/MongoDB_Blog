@@ -72,33 +72,29 @@ app.post('/api/entries', async (req, res) => {
     try {
         const { title, description, content, commentsAllowed, authorId, categoryId } = req.body;
 
-        // Wir bauen das Dokument Schritt für Schritt auf
         const newEntry = {
             title: title,
             description: description,
             creationDate: new Date(),
-            editDates: [], // Muss laut Schema ein Array sein
-            impressionCount: Long.fromNumber(0), // Muss Long sein
+            editDates: [],
+            impressionCount: Long.fromNumber(0),
             commentsAllowed: Boolean(commentsAllowed),
             content: {
                 text: content.text || "",
                 links: content.links || [],
                 images: content.images || []
             },
-            authorId: authorId // Muss ein String sein
+            authorId: authorId
         };
 
-        // WICHTIG: categoryId nur hinzufügen, wenn sie wirklich existiert und valide ist
-        if (categoryId && categoryId.length === 24) {
+        if (categoryId && categoryId.trim() !== "" && categoryId.length === 24) {
             newEntry.categoryId = new ObjectId(categoryId);
         }
-        // Falls du kein NULL im Schema erlaubt hast, darf das Feld hier NICHT auftauchen,
-        // wenn keine Kategorie gewählt wurde.
 
         const result = await db.collection('Entry').insertOne(newEntry);
         res.status(201).json(result);
     } catch (err) {
-        console.error(err); // Damit du im Terminal genau siehst, was schief geht
+        console.error(err);
         res.status(400).json({ error: "Validierungsfehler (Schema)", details: err.message });
     }
 });

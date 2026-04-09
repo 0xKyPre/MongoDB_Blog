@@ -60,6 +60,15 @@
         <h3>Neuen Blog-Beitrag schreiben</h3>
         <form id="blogForm">
             <input type="text" id="title" placeholder="Titel des Beitrags" required>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="categorySelect" style="flex-grow: 1;">
+                    <option value="">Keine Kategorie</option>
+                </select>
+                <input type="text" id="newCategoryName" placeholder="Neue Kat..." style="width: 120px;">
+                <button type="button" onclick="addNewCategory()" style="width: 40px; padding: 5px;">+</button>
+            </div>
+
             <textarea id="desc" placeholder="Kurze Beschreibung" rows="2" required></textarea>
             <textarea id="textContent" placeholder="Dein Text..." rows="5" required></textarea>
             <input type="text" id="links" placeholder="Links (mit Komma trennen)">
@@ -221,6 +230,7 @@
             description: document.getElementById('desc').value,
             commentsAllowed: document.getElementById('allowComments').checked,
             authorId: currentUser.username,
+            categoryId: document.getElementById('categorySelect').value, // ID aus Dropdown
             content: {
                 text: document.getElementById('textContent').value,
                 links: document.getElementById('links').value.split(',').map(l => l.trim()).filter(l => l !== ""),
@@ -241,9 +251,53 @@
         }
     };
 
+    // --- Kategorien laden ---
+    async function loadCategories() {
+        try {
+            const res = await fetch(`${API_URL}/categories`);
+            const categories = await res.json();
+            const select = document.getElementById('categorySelect');
+            
+            // Zurücksetzen außer der ersten Option
+            select.innerHTML = '<option value="">Keine Kategorie</option>';
+            
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat._id;
+                opt.textContent = cat.category;
+                select.appendChild(opt);
+            });
+        } catch (err) {
+            console.error("Kategorien laden fehlgeschlagen", err);
+        }
+    }
+
+    // --- Kategorie hinzufügen ---
+    async function addNewCategory() {
+        const name = document.getElementById('newCategoryName').value.trim();
+        if (!name) return alert("Name eingeben!");
+
+        try {
+            const res = await fetch(`${API_URL}/categories`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ category: name })
+            });
+
+            if (res.ok) {
+                document.getElementById('newCategoryName').value = "";
+                await loadCategories(); // Liste neu laden
+                alert("Kategorie erstellt!");
+            }
+        } catch (err) {
+            alert("Fehler beim Erstellen der Kategorie");
+        }
+    }
+
     // --- INIT ---
     updateUI();
     loadEntries();
+    loadCategories();
 </script>
 
 </body>
