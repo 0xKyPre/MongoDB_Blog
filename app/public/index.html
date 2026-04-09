@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevBlog | MongoDB Exercise</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --card: #ffffff; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: #1e293b; line-height: 1.5; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .card { background: var(--card); padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        form { display: flex; flex-direction: column; gap: 12px; }
+        input, textarea, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; }
+        button { background: var(--primary); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        .entry { border-left: 5px solid var(--primary); }
+        .entry h2 { margin-top: 0; color: #0f172a; }
+        .entry-meta { font-size: 0.85rem; color: #64748b; margin-bottom: 1rem; }
+        .entry-content img { width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin-top: 10px; margin-right: 5px; }
+        .auth-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .hidden { display: none; }
+        #userBadge { font-weight: bold; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>DevBlog</h1>
+        <div id="authStatus">
+            <span id="userBadge">Nicht eingeloggt</span>
+            <button onclick="logout()" id="logoutBtn" class="hidden" style="padding: 5px 10px; margin-left:10px; background:#ef4444">Logout</button>
+        </div>
+    </header>
+
+    <section id="loginArea" class="auth-section">
+        <div class="card">
+            <h3>Registrieren</h3>
+            <form id="registerForm">
+                <input type="text" id="regUser" placeholder="Username (ID)" required>
+                <input type="text" id="regDisplay" placeholder="Anzeigename" required>
+                <input type="password" id="regPass" placeholder="Passwort" required>
+                <input type="date" id="regBirth" required>
+                <input type="text" id="regCountry" placeholder="Land (Optional)">
+                <button type="submit">Account erstellen</button>
+            </form>
+        </div>
+        <div class="card">
+            <h3>Login</h3>
+            <form id="loginForm">
+                <input type="text" id="loginUser" placeholder="Username" required>
+                <input type="password" id="loginPass" placeholder="Passwort" required>
+                <button type="submit">Anmelden</button>
+            </form>
+        </div>
+    </section>
+
+    <section id="editorArea" class="card hidden">
+        <h3>Neuen Blog-Beitrag schreiben</h3>
+        <form id="blogForm">
+            <input type="text" id="title" placeholder="Titel des Beitrags" required>
+            <textarea id="desc" placeholder="Kurze Beschreibung" rows="2" required></textarea>
+            <textarea id="textContent" placeholder="Dein Text..." rows="5" required></textarea>
+            <input type="text" id="links" placeholder="Links (mit Komma trennen)">
+            <label>Bilder hochladen (Base64):</label>
+            <input type="file" id="imageInput" accept="image/*" multiple>
+            <label><input type="checkbox" id="allowComments" checked> Kommentare erlauben</label>
+            <button type="submit">Beitrag veröffentlichen</button>
+        </form>
+    </section>
+
+    <hr>
+
+    <div id="blogEntries">
+        <p>Lade Beiträge...</p>
+    </div>
+</div>
+
+<script>
+    // Server URL (Anpassen falls nötig)
+    const API_URL = 'http://localhost:5000/api';
+    let currentUser = JSON.parse(localStorage.getItem('user'));
+
+    function updateUI() {
+        if (currentUser) {
+            document.getElementById('userBadge').innerText = `Hallo, ${currentUser.displayName}`;
+            document.getElementById('loginArea').classList.add('hidden');
+            document.getElementById('editorArea').classList.remove('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+        } else {
+            document.getElementById('userBadge').innerText = "Gast-Modus";
+            document.getElementById('loginArea').classList.remove('hidden');
+            document.getElementById('editorArea').classList.add('hidden');
+            document.getElementById('logoutBtn').classList.add('hidden');
+        }
+    }
+
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+
+    // LOGIN
+    document.getElementById('loginForm').onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${API_URL}/users/login`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: document.getElementById('loginUser').value,
+                    password: document.getElementById('loginPass').value
+                })
+            });
+            const data = await res.json();
+            if(data.success) {
+                currentUser = data.user;
+                localStorage.setItem('user', JSON.stringify(data.user));
+                updateUI();
+            } else alert("Login fehlgeschlagen!");
+        } catch (err) { alert("Server nicht erreichbar"); }
+    };
+
+    // REGISTER
+    document.getElementById('registerForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const res = await fetch(`${API_URL}/users/register`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: document.getElementById('regUser').value,
+                displayName: document.getElementById('regDisplay').value,
+                password: document.getElementById('regPass').value,
+                birthday: document.getElementById('regBirth').value,
+                country: document.getElementById('regCountry').value
+            })
+        });
+        if(res.ok) alert("Registrierung erfolgreich!");
+        else alert("Fehler (User existiert evtl. schon)");
+    };
+
+    function logout() {
+        localStorage.removeItem('user');
+        location.reload();
+    }
+
+    // LOAD ENTRIES
+    async function loadEntries() {
+        try {
+            const res = await fetch(`${API_URL}/entries`);
+            const data = await res.json();
+            const container = document.getElementById('blogEntries');
+            
+            if (!data.length) {
+                container.innerHTML = "<p>Noch keine Beiträge vorhanden.</p>";
+                return;
+            }
+
+            container.innerHTML = data.map(e => `
+                <div class="card entry">
+                    <h2>${e.title}</h2>
+                    <div class="entry-meta">
+                        Von <strong>${e.authorId || 'System'}</strong> • 
+                        ${new Date(e.creationDate).toLocaleDateString()} • 
+                        Aufrufe: ${e.impressionCount}
+                    </div>
+                    <p><em>${e.description}</em></p>
+                    <div class="entry-content">
+                        <p>${e.content.text}</p>
+                        ${e.content.images?.map(img => `<img src="${img}">`).join('') || ''}
+                        <div style="margin-top:15px">
+                            ${e.content.links?.map(l => `<a href="${l}" target="_blank" style="margin-right:10px">Link</a>`).join('') || ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) { console.error("Fehler beim Laden:", err); }
+    }
+
+    // CREATE ENTRY
+    document.getElementById('blogForm').onsubmit = async (e) => {
+        e.preventDefault();
+        
+        const imageFiles = document.getElementById('imageInput').files;
+        const base64Images = [];
+        for(let file of imageFiles) {
+            base64Images.push(await toBase64(file));
+        }
+
+        const payload = {
+            title: document.getElementById('title').value,
+            description: document.getElementById('desc').value,
+            commentsAllowed: document.getElementById('allowComments').checked,
+            authorId: currentUser.username, // Matcht Schema-Feld
+            content: {
+                text: document.getElementById('textContent').value,
+                links: document.getElementById('links').value.split(',').map(l => l.trim()).filter(l => l !== ""),
+                images: base64Images
+            }
+        };
+
+        const res = await fetch(`${API_URL}/entries`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            location.reload();
+        } else {
+            const errData = await res.json();
+            alert("Schema-Fehler: " + errData.details);
+        }
+    };
+
+    // Initialisierung
+    updateUI();
+    loadEntries();
+</script>
+
+</body>
+</html>
