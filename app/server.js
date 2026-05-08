@@ -1,5 +1,5 @@
 const express = require('express');
-const { MongoClient, ObjectId, Long } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const path = require('path');
 const cors = require('cors');
 const app = express();
@@ -9,8 +9,8 @@ app.use(express.json({ limit: '10mb' }));
 // Pfad für statische Dateien angepasst (stellt sicher, dass index.html gefunden wird)
 app.use(express.static(path.join(__dirname, 'public'))); 
 
-const url = 'mongodb://localhost:27018'; // Dein Port 27018 laut Schema-Script
-const dbName = 'blog';
+const url = process.env.MONGODB_URI || 'mongodb://localhost:27018';
+const dbName = process.env.MONGODB_DBNAME || 'blog';
 let db;
 
 // wahl a billa
@@ -59,9 +59,29 @@ app.post('/api/users/login', async (req, res) => {
 
 // --- BLOG ROUTES ---
 
+app.post('/api/entries/impression', async (req, res) => {
+    try {
+        const { id } = req.query;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Ungültige Entry-ID" });
+        }
+        const result = await db.collection('Entry').findOneAndUpdate(
+            { _id: new ObjectId(id) },
+            { $inc: { impressionCount: 1 } },
+            { returnDocument: 'after' }
+        );
+        if (!result.value) {
+            return res.status(404).json({ error: "Beitrag nicht gefunden" });
+        }
+        res.json({ success: true, impressionCount: result.value.impressionCount });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/entries', async (req, res) => {
     try {
-        const entries = await db.collection('Entry').find().toArray();
+        const entries = await db.collection('Entry').find().sort({ creationDate: -1 }).toArray();
         res.json(entries);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -77,7 +97,7 @@ app.post('/api/entries', async (req, res) => {
             description: description,
             creationDate: new Date(),
             editDates: [],
-            impressionCount: Long.fromNumber(0),
+            impressionCount: 0,
             commentsAllowed: Boolean(commentsAllowed),
             content: {
                 text: content.text || "",
@@ -206,7 +226,7 @@ app.post('/api/comments', async (req, res) => {
 
         const newComment = {
             text: trimmedText,
-            likes: Long.fromNumber(0),
+            likes: 0,
             creationDate: new Date(),
             entryId: new ObjectId(entryId),
             authorId: authorId // String

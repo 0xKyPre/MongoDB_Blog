@@ -426,6 +426,24 @@
                 return;
             }
 
+            setTimeout(() => {
+                document.querySelectorAll('.card.entry').forEach(card => {
+                    const entryId = card.getAttribute('data-entry-id');
+                    if (!entryId) return;
+                    let hasImpressed = false;
+                    const observer = new IntersectionObserver((entries, obs) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting && !hasImpressed) {
+                                hasImpressed = true;
+                                fetch(`${API_URL}/entries/impression?id=${encodeURIComponent(entryId)}`, { method: 'POST' });
+                                obs.disconnect();
+                            }
+                        });
+                    }, { threshold: 0.5 });
+                    observer.observe(card);
+                });
+            }, 300);
+
             container.innerHTML = data.map(e => {
                 const safeTitle = escapeHTML(e.title);
                 const safeDesc = escapeHTML(e.description);
@@ -458,7 +476,7 @@
                     : `<div style="font-size:11px; color:#666666; margin-top:10px;">Kommentare sind deaktiviert.</div>`;
 
                 return `
-                    <div class="card entry">
+                    <div class="card entry" data-entry-id="${entryId}">
                         <h2>${safeTitle} ${categoryTag}</h2>
                         <div class="entry-meta">
                             Von <strong>${safeAuthor || 'System'}</strong> • 
